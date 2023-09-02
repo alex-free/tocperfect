@@ -1,0 +1,20 @@
+#!/bin/bash
+
+version=1.1
+set -e
+git submodule update --recursive --init 
+
+cd "$(dirname "$0")"
+if [ "$1" == "clean" ]; then
+    ./genwin "$version" clean
+    ./genlin "$version" clean
+elif [ "$1" == "tonyhax-toolchain" ]; then
+    tonyhax/scripts/build-tool-chain.sh
+elif [ "$1" == "tonyhax-exe" ]; then
+    tonyhax/scripts/build-tocperfect.sh
+elif [ "$1" == "patcher" ]; then
+    ./genwin "$version"
+    ./genlin "$version"
+else
+    echo -e "Usage:\n\nbuild <what to build>\nbuild clean     Clean all built artifacts\n\nbuild tonyhax-toolchain      Build the toolchain required to build the tonyhax exe file\n\nbuild tonyhax-exe       Build the tonyhax executable\n\nbuild patcher     Build the patcher\n"
+fi

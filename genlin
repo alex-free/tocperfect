@@ -1,0 +1,80 @@
+#!/bin/bash
+set -e
+
+if [ "$#" -lt 1 -a "$#" -gt 3 ]; then
+    echo "Incorrect number of arguments given to $0, aborted"
+    exit 1
+fi
+
+version="$1"
+arch=$(uname -p)
+platform=linux
+package=tocperfect-v"$version"-"$platform"-"$arch"
+cd "$(dirname "$0")"
+rm -rf \
+"$package" \
+"$package".zip \
+build-tmp
+
+if [ "$2" == "clean" ]; then
+    exit 0
+fi
+
+mkdir "$package"
+mkdir build-tmp
+
+cd mkpsxiso
+git submodule update --init --recursive
+cd ../
+cp -r mkpsxiso build-tmp
+cd build-tmp/mkpsxiso
+cmake -S . -B ./build -DCMAKE_BUILD_TYPE=Release
+cmake --build ./build
+cd ../../
+
+# MKPSXISO
+pled/pled build-tmp/mkpsxiso/build/mkpsxiso "$package"/bin
+
+# DUMPSXISO
+pled/pled build-tmp/mkpsxiso/build/dumpsxiso "$package"/bin
+
+# MOVSEC
+gcc movsec.c -o "$package"/bin/movsec
+
+# BINMERGE
+cp binmerge/binmerge "$package"/bin/binmerge
+
+# EDCRE
+cp -r edcre build-tmp
+make -C build-tmp/edcre linux-x86_64
+cp build-tmp/edcre/edcre "$package"/bin/edcre
+rm -rf build-tmp
+
+# PYTHON
+cp python3.2-static "$package"/bin/python
+
+cp -r \
+tocperf \
+resources \
+readme.md \
+images \
+"$package"
+
+# Copy licenses
+mkdir "$package"/licenses
+cp mkpsxiso/LICENSE.md "$package"/licenses/mkpsxiso.txt
+cp tonyhax/LICENSE "$package"/licenses/tonyhax-international.txt
+cp pled/unlicense.txt "$package"/licenses/pled.txt
+cp edcre/license.txt "$package"/licenses/edcre.txt
+cp binmerge/LICENSE "$package"/licenses/binmerge.txt
+
+cp -r \
+licenses/bash.txt \
+licenses/coreutils.txt \
+licenses/python.txt \
+licenses/movsec.txt \
+licenses/tocperfect.txt \
+"$package"/licenses
+
+chmod -R 777 "$package"
+zip -r "$package".zip "$package"

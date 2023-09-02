@@ -1,0 +1,72 @@
+#!/bin/bash
+set -e
+
+if [ "$#" -lt 1 -a "$#" -gt 3 ]; then
+    echo "Incorrect number of arguments given to $0, aborted"
+    exit 1
+fi
+
+version="$1"
+arch=$(uname -p)
+platform=windows
+package=tocperfect-v"$version"-"$platform"-"$arch"
+cd "$(dirname "$0")"
+
+rm -rf \
+"$package" \
+"$package".zip
+
+if [ "$2" == "clean" ]; then
+    exit 0
+fi
+
+mkdir -p "$package"/bin
+
+# MOVSEC
+x86_64-w64-mingw32-gcc -static movsec.c -o "$package"/bin/movsec.exe
+
+# EDCRE
+rm -rf build-tmp
+mkdir build-tmp
+cp -r edcre build-tmp
+make -C build-tmp/edcre windows-x86_64
+cp build-tmp/edcre/edcre.exe "$package"/bin/edcre.exe
+rm -rf build-tmp
+
+cp -r \
+mkpsxiso-2.03-win64/bin/* \
+python-3.11.4-embed-amd64/* \
+binmerge/binmerge \
+msys2-bin-8-22-2023/* \
+"$package"/bin
+
+cp -r \
+tocperf \
+tocperf.bat \
+resources \
+readme.md \
+images \
+"$package"
+
+# Change shabang for bash.exe on Windows via cmd.exe
+sed -i -e 's|#!/bin/bash|#!bash|g' "$package"/tocperf
+
+# Copy licenses
+mkdir "$package"/licenses
+cp mkpsxiso/LICENSE.md "$package"/licenses/mkpsxiso.txt
+cp tonyhax/LICENSE "$package"/licenses/tonyhax-international.txt
+cp pled/unlicense.txt "$package"/licenses/pled.txt
+cp edcre/license.txt "$package"/licenses/edcre.txt
+cp binmerge/LICENSE "$package"/licenses/binmerge.txt
+
+cp -r \
+licenses/bash.txt \
+licenses/coreutils.txt \
+licenses/python.txt \
+licenses/movsec.txt \
+licenses/tocperfect.txt \
+"$package"/licenses
+
+
+chmod -R 777 "$package"
+zip -r "$package".zip "$package"

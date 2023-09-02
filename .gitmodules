@@ -1,0 +1,15 @@
+[submodule "mkpsxiso"]
+	path = mkpsxiso
+	url = https://github.com/lameguy64/mkpsxiso
+[submodule "pled"]
+	path = pled
+	url = https://github.com/alex-free/pled
+[submodule "binmerge"]
+	path = binmerge
+	url = https://github.com/putnam/binmerge
+[submodule "edcre"]
+	path = edcre
+	url = https://github.com/alex-free/edcre
+[submodule "tonyhax"]
+	path = tonyhax
+	url = https://github.com/alex-free/tonyhax

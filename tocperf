@@ -1,0 +1,140 @@
+#!/bin/bash
+
+echo -e "TOCPerfect Patcher by Alex Free v1.1 (8/28/2023)\nhttps://alex-free.github.io/tocperfect\n"
+
+if [ "$#" -ne 1 ]; then
+	echo "Usage: "$0" <cue file>"
+	exit 1
+fi
+
+# ./bin/dirname.exe in not yet in the $PATH on Windows, so on Windows we make sure that we start the script from the current directory in tocperf.bat, which executes everything through cmd.exe in the current directory. If we can't find ./tocperf.bat then we must be on Linux, which will have dirname in the $PATH, so we can and do need to actually then change into the directory that this script is in.
+if [ ! -f "./tocperf.bat" ]; then
+    cd "$(dirname "$0")"
+fi
+
+# Now that we are sure we are in the directory of ./tocperf, we can add all the self-contained binaries we need to the $PATH used within this script.
+PATH="${PWD}"/bin:"$PATH"
+#echo $PATH
+
+output_base_name=$(basename "$1")
+output_name="${output_base_name%%}"
+output_name_without_extension="${output_base_name%%.*}"
+number_of_tracks=$(grep -c "TRACK" "$1")
+output_dir=$(dirname "$1")
+rm -rf tocperfect-rip
+mkdir tocperfect-rip
+
+# If there are more then 1 track in the cue sheet, then this is a rip with CDDA tracks. DUMPSXISO/MKPSXISO don't support deriving information from cue sheets when dumping an image, so we need to append all the subsequent CDDA tracks to the first data track using binmerge. This allows DUMPSXISO/MKPSXISO to know about the CDDA tracks so that it can correctly dump and rebuild.
+if [[ "$number_of_tracks" -gt 1 ]]; then
+# Merge the data and CDDA tracks into a single bin file in the tocperfect-rip directory.
+   python bin/binmerge -o tocperfect-rip "$1" "$output_name_without_extension"
+else
+# There is only one track in this rip so it only has a data track. Just copy the data track file
+    cp "$output_dir"/"$output_name_without_extension".bin tocperfect-rip
+fi
+
+# Now that we have a complete bin file gaurenteed to have all tracks, dump into tocperfect-rip.d
+dumpsxiso tocperfect-rip/"$output_name_without_extension".bin -s tocperfect-rip/tocperfect.xml -x tocperfect-rip
+
+# Read license data from sector 4. We need to save the license data for later because we will rebuild the final image with Japanese license data to allow the early SCPH-3000s with the CD Player Swap trick to boot any TOCPerfect patched CD-R. We will use this saved info and write it at sector 15 for reference by the Tonyhax International loader (for switching video modes, etc.).
+movsec -r tocperfect-rip/"$output_name_without_extension".bin
+
+# Change license data to Japanese by specifying the license file in the resources directory.
+sed -i -e 's|<license file="license_data.dat"/>|<license file="../resources/licensej.dat"/>|g' tocperfect-rip/tocperfect.xml
+
+# Super early Japanese releases of games such as Ridge Racer, King's Feild, Arc The Lad, Jumping Flash! (Demo) don't have a SYSTEM.CNF, only PSX.EXE. Copy a SYSTEM.CNF file into the tocperfect-rip directory with BOOT=cdrom:\PSX.EXE;1. Then it is basically equivelent to if it did have a SYSTEM.CNF in the first place because SYSTEM.CNF has a higher boot priority then PSX.EXE in the PSX BIOS.
+if [ ! -f "tocperfect-rip/SYSTEM.CNF" ]; then
+    has_no_system_cnf=1
+    cp resources/system.cnf tocperfect-rip/SYSTEM.CNF
+fi
+
+# Change the BOOT text in SYSTEM.CNF to BOOY. A new BOOT line will be prepeneded later for TONYHAX.EXE, whererever that ends up in the ISO filesystem.
+sed -i -e 's|BOOT|BOOY|g' tocperfect-rip/SYSTEM.CNF
+
+# Get number of 'fake files' which only reference an audio track but do not actually contain the audio data.
+has_fake_da=$(grep -E -c '<file name=.*trackid=.*type="da"/>' tocperfect-rip/tocperfect.xml)
+echo "Found "$has_fake_da" CDDA reference files"
+
+# If the number of 'fake files' which only refernce and audio track but do not actually contain the audio data is greater then 0 (so at least 1) then we know that we need extremely special handling of where we put TONYHAX.EXE (and also SYSTEM.CNF if this is a PSX.EXE game) at the end of the disc. TONYHAX.EXE must be the last file in the first data track, so it can not have an LBA greater then any of these 'fake files'. It must be prepended before the first 'fake file'.
+if [[ "$has_fake_da" -gt 0 ]]; then
+# Get only the first match as $is_first_cdda so we are not appendeding duplicate TONYHAX.EXE entries in the XML.
+    is_first_cdda="$(grep -E '<file name=.*trackid=.*type="da"/>' tocperfect-rip/tocperfect.xml | head -1)"
+
+    mkdir tocperfect-rip/tonyhax-test-build
+    mkdir tocperfect-rip/tonyhax-test-rip
+    
+    if [[ "$has_no_system_cnf" -eq 1 ]]; then
+        sed -z -i -e "s|$is_first_cdda|<file name="\"TONYHAX.EXE"\" source="\"../resources/tonyhax.exe"\" type="\"data"\"/>\n<file name="\"SYSTEM.CNF"\" source="\"tocperfect-rip/SYSTEM.CNF"\" type="\"data"\"/>\n$is_first_cdda\n|" tocperfect-rip/tocperfect.xml
+    else
+        sed -z -i -e "s|$is_first_cdda|<file name="\"TONYHAX.EXE"\" source="\"../resources/tonyhax.exe"\" type="\"data"\"/>\n$is_first_cdda\n|" tocperfect-rip/tocperfect.xml
+    fi
+
+# Rebuild into a sub directory 'tocperfect-rip/tonyhax-test-build'
+    mkpsxiso -y -o tocperfect-rip/tonyhax-test-build/"$output_name_without_extension".bin tocperfect-rip/tocperfect.xml
+# Rip the newest rebuild from 'tocperfect-rip/tonyhax-test-build' into 'tocperfect-rip/tonyhax-test-rip'
+    dumpsxiso tocperfect-rip/tonyhax-test-build/"$output_name_without_extension".bin -s tocperfect-rip/tocperfect-test-build/tocperfect.xml -x tocperfect-rip/tonyhax-test-rip
+
+# Find TONYHAX.EXE location from ripped rebuild (it could be in a directory, we don't actually know where it is yet)
+    cd tocperfect-rip/tonyhax-test-rip
+    tonyhax_exe_line=$(find . -name 'TONYHAX.EXE')
+
+# Fix delimiter from unix / to proper \ for PSX
+    tonyhax_exe_line="$(echo "$tonyhax_exe_line" | sed 's|/|\\|g')"
+    
+# Make BOOT line, replace .\ with BOOT=cdrom:\
+    tonyhax_exe_line="$(echo "$tonyhax_exe_line" | sed 's|.\\|BOOT = cdrom:\\|')"
+
+# Append ;1
+    tonyhax_exe_line="$(echo "$tonyhax_exe_line"";1")"
+
+# Remove build/rip used to find TONYHAX.EXE location in ISO filesystem.
+    cd ../../
+    rm -rf \
+    tocperfect-rip/tocperfect-test-build \
+    tocperfect-rip/tocperfect-test-rip \
+
+# We are ready to go with our valid BOOT line to TONYHAX.EXE, be it in a subdirectory or just in the root of the ISO filesystem.
+    echo "$tonyhax_exe_line"
+# BOOT Must be first line to avoid any garbage interfering that was left in the empty new line of SYSTEM.CNF from game rips back in the day.
+    echo -e "$tonyhax_exe_line\n$(cat tocperfect-rip/SYSTEM.CNF)" > tocperfect-rip/SYSTEM.CNF
+else
+# Append TONYHAX.EXE and SYSTEM.CNF to the data track as last file. If there are dummy sectors in the image then we need to change the detection for where to add the files (but that actually might be redundant now that we handle DA like we do above)
+    has_dummy=$(grep -c "dummy sectors" tocperfect-rip/tocperfect.xml)
+    if [[ "$has_dummy" -gt 0 ]]; then
+        if [[ "$has_no_system_cnf" -eq 1 ]]; then
+            sed -i -e 's|<dummy sectors="150"/>|<file name="TONYHAX.EXE" source="../resources/tonyhax.exe" type="data"/>\n<file name="SYSTEM.CNF" source="SYSTEM.CNF" type="data"/>\n<dummy sectors="150"/>|g' tocperfect-rip/tocperfect.xml
+        else
+            sed -i -e 's|<dummy sectors="150"/>|<file name="TONYHAX.EXE" source="../resources/tonyhax.exe" type="data"/>\n<dummy sectors="150"/>|g' tocperfect-rip/tocperfect.xml
+        fi
+    else
+        if [[ "$has_no_system_cnf" -eq 1 ]]; then
+            sed -i -e 's|</directory_tree>|<file name="TONYHAX.EXE" source="../resources/tonyhax.exe" type="data"/>\n<file name="SYSTEM.CNF" source="SYSTEM.CNF" type="data"/>\n</directory_tree>|g' tocperfect-rip/tocperfect.xml
+        else
+            sed -i -e 's|</directory_tree>|<file name="TONYHAX.EXE" source="../resources/tonyhax.exe" type="data"/>\n</directory_tree>|g' tocperfect-rip/tocperfect.xml     
+        fi
+    fi
+
+# BOOT Must be first line.
+    echo -e "BOOT = cdrom:\TONYHAX.EXE;1\n$(cat tocperfect-rip/SYSTEM.CNF)" > tocperfect-rip/SYSTEM.CNF
+fi
+# Rebuild track 01 bin file (overwrites existing old file) at base of tocperfect-rip directory. Final build of ISO filesystem.
+mkpsxiso -y -o tocperfect-rip/"$output_name_without_extension".bin tocperfect-rip/tocperfect.xml
+
+# Write license data from sector 4 to sector 15/. This does invalidate EEC/EDC in sector 15 since we are just copying the value calculated from sector 4 sync data so we need to fix this later with EDCRE.
+movsec -w tocperfect-rip/"$output_name_without_extension".bin
+
+# Split back into redump.org format and overwrite original files
+if [[ "$number_of_tracks" -gt 1 ]]; then
+# If the CDDA tracks are not explicitely referenced by 'fake' 'reference' *.DA files in the ISO, they won't be appeneded to the ISO built by MKPSXISO even though we did binmerge them (Ridge Racer Japan is like this). In this case, just copy the first data track bin file back to the input directory since it is already equivlently split by mkpsxiso rebuilding the image. Otherwise we need to use binmerge to split the tracks back. This can be detected by seeing the return code of binmerge. If the files have been essentially split already by the MKPSXISO rebuild binmerge will error and it doesn't matter so we hide the output.
+    python bin/binmerge --split -o tocperfect-rip/final tocperfect-rip/"$output_name_without_extension".cue "$output_name_without_extension" > /dev/null 2>&1
+    track_list=(tocperfect-rip/final/*.bin)
+else
+    track_list=(tocperfect-rip/*.bin)
+fi
+
+# Fix EDC/EEC in Lsector 15 (which contains our moved license data)
+edcre -v "${track_list[0]}"
+cp "${track_list[0]}" "$output_dir"
+
+rm -rf tocperfect-rip
+echo -e "\nDone"

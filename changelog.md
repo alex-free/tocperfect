@@ -1,6 +1,16 @@
 # Changelog
 
-### Version 1.1 (9/2/2023)
+## Version 1.1.1 (9/3/2023)
+
+*	[tocperfect-v1.1.1-windows-x86\_64](https://github.com/alex-free/tocperfect/releases/download/v1.1.1/tocperfect-v1.1.1-windows-x86_64.zip) _For Windows 10 64-bit or newer_
+
+*	[tocperfect-v1.1.1-linux-x86\_64](https://github.com/alex-free/tocperfect/releases/download/v1.1.1/tocperfect-v1.1.1-linux-x86_64.zip) _For x86_64 Linux Distributions_
+
+Changes:
+
+*   Updated Tonyhax International to version 1.3.9.
+
+## Version 1.1 (9/2/2023)
 
 *	[tocperfect-v1.1-windows-x86\_64](https://github.com/alex-free/tocperfect/releases/download/v1.1/tocperfect-v1.1-windows-x86_64.zip) _For Windows 10 64-bit or newer_
 

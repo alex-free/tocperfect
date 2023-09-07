@@ -45,15 +45,21 @@ _When booting a [TOCPerfect Patched CD-R](#how-to-apply-the-tocperfect-patch) wi
 
 ## Downloads
 
-### Version 1.1.1 (9/2/2023)
+### Version 1.1.2 (9/7/2023)
 
-*	[tocperfect-v1.1.1-windows-x86\_64](https://github.com/alex-free/tocperfect/releases/download/v1.1.1/tocperfect-v1.1.1-windows-x86_64.zip) _For Windows 10 64-bit or newer_
+*	[tocperfect-v1.1.2-windows-x86\_64](https://github.com/alex-free/tocperfect/releases/download/v1.1.2/tocperfect-v1.1.2-windows-x86_64.zip) _For Windows 10 64-bit or newer_
 
-*	[tocperfect-v1.1.1-linux-x86\_64](https://github.com/alex-free/tocperfect/releases/download/v1.1.1/tocperfect-v1.1.1-linux-x86_64.zip) _For x86_64 Linux Distributions_
+*	[tocperfect-v1.1.2-linux-x86\_64](https://github.com/alex-free/tocperfect/releases/download/v1.1.2/tocperfect-v1.1.2-linux-x86_64.zip) _For x86_64 Linux Distributions_
 
 Changes:
 
-*   Updated Tonyhax International to version 1.3.9.
+*   Games which contain CDDA audio tracks not referenced by the data track filesystem (such as Ridge Racer Japan) now work on real hardware and not just emulators. This issue was caused by mkpsxiso not putting in dummy sectors in this case (which may be a bug in that software?).
+
+*   Patcher now shows the edited xml used in the final build during patching.
+
+*   Updated EDCRE to version 1.0.3.
+
+*   Updated Tonyhax International to version 1.4.0.
 
 [About Previous Versions](changelog.md).
 
@@ -131,7 +137,7 @@ License: Unlicense (`licenses/pled.txt`)
 
 ### [EDCRE](https://github.com/alex-free/edcre)
 
-Version: 1.0.2
+Version: 1.0.3
 License: GNU GPLv2 (`licenses/edcre.txt`)
 
 ### [BINMerge](https://github.com/putnam/binmerge)

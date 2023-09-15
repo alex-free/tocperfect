@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo -e "TOCPerfect Patcher by Alex Free v1.1.2 (9/7/2023)\nhttps://alex-free.github.io/tocperfect\n"
+echo -e "TOCPerfect Patcher by Alex Free v1.1.3 (9/15/2023)\nhttps://alex-free.github.io/tocperfect\n"
 
 if [ "$#" -ne 1 ]; then
 	echo "Usage: "$0" <cue file>"
